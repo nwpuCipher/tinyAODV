@@ -4,7 +4,6 @@
 # author: cipher
 # create date: 2012-3-1
 # Main_version: 0.1
-
 # change_log_1
 # edit_by: cipher
 # data: 2012-3-2

@@ -22,25 +22,42 @@
 # 1.a method for move model should be established, So the
 # MobileNode will obey the SRP and will be decoupled.
 
+# change_log_2
+# edited_by： cipher
+# data 2012-3-2
+# sub_version: 0.1.1
+#
+# change_list:
+# 1. in order to solove the problem.1, all the codes have been rewriten
+# 2. added some comments for a good understand of some codes
+# 3. added some method for processing packets in class AODV and the node
+# could deliever HELLO packet now
+#
+# problem:
+# 1. newly added codes must be constructed later
+
 
 import math
 import random
+import sys
+import pylab
 
+# this func calc the distance between two point
 def distance(p1,p2):
     return math.sqrt( (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2 )
 
-
 class MobileModel:
-    maxWidth = 1000
-    maxHeight = 1000
+    # the param for the sence
+    maxWidth = 10000
+    maxHeight = 10000
     scale = 10
     minSpeed = 0
     maxSpeed = 20
     time = 1
-
+    
     def __init__(self):
         pass
-
+    
     def randomSpeed(self):
         return random.randint(self.minSpeed,self.maxSpeed)
     def randomWidth(self):
@@ -61,9 +78,16 @@ class RandomWayPoint(MobileModel):
         
         self.maxWidth ,self.maxHeight, self.scale ,self.minSpeed, self.maxSpeed, self.time = arg
     def move(self):
+        # if current speed = 0, we need to randomSpeed for this node
         if self.curSpeed == 0:
             self.setSpeed(self.randomSpeed())
             return
+        # if the distance between current point and next point is below curSpeed
+        # we need:
+        # curPos = nxtPos
+        # curSpeed = randomSpeed()
+        # nxtPos = nextWayPoint -- w
+        # else will calc the new current point with nextCurPoint()
         if( distance( self.curPos,self.nxtPos ) < self.curSpeed ):
             self.setCurPos(self.nxtPos)
             self.setSpeed(self.randomSpeed())
@@ -77,7 +101,8 @@ class RandomWayPoint(MobileModel):
         self.nxtPos = nxtPos
     def setSpeed(self,curSpeed):
         self.curSpeed = curSpeed
-
+    
+    # divide the speed in x and y direction
     def divideSpeed(self):
         x = abs(self.curPos[0] - self.nxtPos[0])
         y = abs(self.curPos[1] - self.nxtPos[1])
@@ -90,7 +115,7 @@ class RandomWayPoint(MobileModel):
     def nextWayPoint(self):
         x = self.curPos[0]+self.randomWidth()
         y = self.curPos[1]+self.randomHeight()
-        while x < 0 or y < 0:
+        while x < 0 or y < 0 or x > self.maxWidth or y > self.maxHeight:
             x = self.curPos[0]+self.randomWidth()
             y = self.curPos[1]+self.randomHeight()
         return x, y
@@ -123,6 +148,8 @@ class RouteProtocl:
 
 class AODV(RouteProtocl):
     addr = 0
+
+    
     def __init__(self):
         self.addr = random.randint(0,100)
         self.packetQueue = dict( zip( ('rcv', 'snd'), ([],[]) ) )
@@ -131,45 +158,51 @@ class AODV(RouteProtocl):
                                              ([],[],[],[],[])))
                                         ,dict(zip(('HELLO','RREQ','RREP','REER','DATA'), 
                                               ([],[],[],[],[]) ) ) )))
-        self.packetQueue['snd'].append([self.addr,'HELLO'])
+        self.packetQueue['snd'].append(['HELLO', self.addr,100])
+
+    def timer(self):
+        pass
+                    
+                    
 
     def send(self):
         try:
-            packet =  self.packetQueue['snd'].pop(0)
-            self.staticsQueue['sndd'][packet[1]].append(packet)
+            packet  =  self.packetQueue['snd'].pop(0)
+            self.staticsQueue['sndd'][packet[0]].append(packet[1:0])
             return packet
         except:
             return False
     def receive(self, packet):
-        if  packet != False and packet[0] != self.addr:
+        if  packet != False and packet[1] != self.addr:
             self.packetQueue['rcv'].append(packet)
         self.processPacket()
 
-    def hello(self, packet):
+    def HelloPkt(self, packet):
+        self.neighbours.append(packet[1:])
+        
+    def RreqPkt(self, packet):
         pass
-    def rreq(self, packet):
+    def RrepPkt(self, packet):
         pass
-    def rrep(self, packet):
+    def RerrPtk(self, packet):
         pass
-    def rerr(self, packet):
+    def DataPtk(self, packet):
         pass
-    def data(self, packet):
-        pass
-    
+
 
 
 
     def processPacket(self):
+        dispatch = {'HELLO':self.HelloPkt, 'RREQ':self.RreqPkt, 'RREP':self.RrepPkt,
+                    'RERR':self.RerrPtk, 'DATA':self.DataPtk}
         try:
-            packet = self.packetQueue['rcv'].pop(0)
+            packet  = self.packetQueue['rcv'].pop(0)
             
         except:
             return
-        ####
 
-        ###
-        
-        self.staticsQueue['rcvd'][packet[1]].append(packet)
+        dispatch[packet[0]](packet)
+        self.staticsQueue['rcvd'][packet[0]].append(packet[1:])
 
 
 class Node:
@@ -188,14 +221,11 @@ class Node:
         self.rPro.receive(packet)
         
 
- 
-import sys
-import pylab
 
 
 
 nodes = [ Node(AODV,RandomWayPoint,[1,2],[4,5],1,1000,1000,10,0,20, 1 ), 
-          Node(AODV,RandomWayPoint,[20,20], [23,24],1, 1000,1000,10,0,10,  1) ]
+          Node(AODV,RandomWayPoint,[20,20], [23,24],1, 1000,1000,10,0,10, 1) ]
 
 arrx = [[],[]]
 arry = [[],[]]
@@ -207,11 +237,9 @@ for i in range(2000):
         arrx[index].append(pos[0])
         arry[index].append(pos[1])
 
-        
-
-pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
-pylab.figtext(0.35,0.05,'node mobile modle')
-pylab.show()
+#pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
+#pylab.figtext(0.35,0.05,'node mobile modle')
+#pylab.show()
 
 for netnode in nodes:
     packet = netnode.send()
@@ -220,3 +248,4 @@ for netnode in nodes:
 
 for netnode in nodes:
     print netnode.rPro.addr, netnode.rPro.staticsQueue
+    print netnode.rPro.neighbours

@@ -35,7 +35,6 @@
 # problem:
 # 1. newly added codes must be constructed later
 
-
 import math
 import random
 import sys
@@ -153,6 +152,7 @@ class AODV(RouteProtocl):
     sequenceNo = 0;
    
     rreqQueue = []
+    rrepQueue = []
 
     
     
@@ -165,6 +165,7 @@ class AODV(RouteProtocl):
                                         ,dict(zip(('HELLO','RREQ','RREP','REER','DATA'), 
                                               ([],[],[],[],[]) ) ) )))
         self.rreqQueue = list()
+        self.rrepQueue = list()
         self.routeTable = dict()
         self.packetQueue['snd'].append(['HELLO', self.addr,100])
         self.packetQueue['snd'].append(['RREQ', 90,50,50,13,13,0])
@@ -185,8 +186,7 @@ class AODV(RouteProtocl):
     #['HELLO', source_addr, source_sequence#]
     def helloPktSend(self, packet):
         pass
-    #['RREQ', source_addr, source_sequence#, broadcast_id,
-    #dest_addr, dest_sequence#, hop_cnt]
+    #['RREQ', source_addr, source_sequence#, broadcast_id, dest_addr, dest_sequence#, hop_cnt]
     def rreqPktSend(self, packet):
         if packet[1] == self.addr:
             packet[2:4] = self.sequenceNo, self.broadcast_id
@@ -224,21 +224,45 @@ class AODV(RouteProtocl):
             self.routeTable[packet[1]]
             #todo: update routeTable
         except:
-            self.routeTable[packet[1]]= dict(zip( ('ntHop', 'numOfHops', 'seqNo', 'actvNgbrs', 'expirTime'),
+            self.routeTable[packet[1]]= dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
                                               (packet[1], 0, packet[2], [packet[1]], 3)))
     def rreqPktReceived(self, packet):
+        # if i'm the destination, generate a RREP
         if packet[4] == self.addr:
-            pass
-        else:
-            pack = packet[:]
-            pack[6] = pack[6] + 1
-            self.packetQueue['snd'].append(pack)
+            tmpPacket = ['RREP', packet[1], packet[4], self.sequenceNo, packet[6], 999]
+            self.rrepQueue.append( [0,tmpPacket[1:3]] )
+        else:    
+            try:
+                # if not, check the rreqQueue to make sure we have this rreq already
+                for t, entry in self.rreqQueue:
+                    if entry[0] == packet[1] and entry[2] == packet[3]:
+                        return
+                # check the routeTbale
+                rec = self.routeTable[packet[4]]
+                # compare dest_sequence# with rrep's
+                if rec['dstSeqNo'] >= packet[5]:
+                    tmpPacket = ['RREP', packet[1], packet[4], rec['dstSeqNo'],packet[6]+rec['numOfHops']]
+                    self.rrepQueue.append( [0,tmpPacket[1:3]] )
+                else:
+                    # just route it away
+                     tmpPacket = packet[:]
+                     tmpPacket[6] = tmpPacket[6] + 1
+                     self.rreqQueue.append([0,tmpPacket[1:5]])
+            except:
+                tmpPacket = packet[:]
+                tmpPacket[6] = tmpPacket[6] + 1
+                self.rreqQueue.append([0,tmpPacket[1:5]])
+
+        self.packetQueue['snd'].append(tmpPacket)
+    #['RREQ', source_addr, source_sequence#, broadcast_id, dest_addr, dest_sequence#, hop_cnt]
+    #['RREP', s_addr, d_addr, d_seq#, hop_cnt, lifetime]
     def rrepPktReceived(self, packet):
         pass
     def rerrPtkReceived(self, packet):
         pass
     def dataPtkReceived(self, packet):
         pass
+
     def processReceivedPacket(self):
         recivedPacketDispatcher = {'HELLO':self.helloPktReceived, 'RREQ':self.rreqPktReceived, 'RREP':self.rrepPktReceived,
                     'RERR':self.rerrPtkReceived, 'DATA':self.dataPtkReceived }
@@ -287,7 +311,7 @@ for i in range(2000):
 #pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
 #pylab.figtext(0.35,0.05,'node mobile modle')
 #pylab.show()
-for n in range(3):
+for n in range(5):
     for netnode in nodes:
         i = netnode.rPro.addr
         packet = netnode.send()
@@ -299,3 +323,5 @@ for netnode in nodes:
     print netnode.rPro.addr, netnode.rPro.staticsQueue
     print 'routeTB',netnode.rPro.routeTable
     print 'packet', netnode.rPro.packetQueue
+    print 'rreqQ', netnode.rPro.rreqQueue
+    print 'rrepQ', netnode.rPro.rrepQueue

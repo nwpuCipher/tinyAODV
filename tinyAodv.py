@@ -22,7 +22,7 @@
 # MobileNode will obey the SRP and will be decoupled.
 
 # change_log_2
-# edited_by： cipher
+# edited_by: cipher
 # data 2012-3-2
 # sub_version: 0.1.1
 #
@@ -135,9 +135,10 @@ class RandomWayPoint(MobileModel):
 
 
 class RouteProtocl:
-    neighbours = []
+
     packetQueue = {}
     staticsQueue = {}
+    routeTable = {}
     def __init__(self):
         pass
     def send(self):
@@ -146,8 +147,14 @@ class RouteProtocl:
         pass
 
 class AODV(RouteProtocl):
+    
     addr = 0
+    broadcast_id = 0
+    sequenceNo = 0;
+   
+    rreqQueue = []
 
+    
     
     def __init__(self):
         self.addr = random.randint(0,100)
@@ -157,51 +164,92 @@ class AODV(RouteProtocl):
                                              ([],[],[],[],[])))
                                         ,dict(zip(('HELLO','RREQ','RREP','REER','DATA'), 
                                               ([],[],[],[],[]) ) ) )))
+        self.rreqQueue = list()
+        self.routeTable = dict()
         self.packetQueue['snd'].append(['HELLO', self.addr,100])
-
+        self.packetQueue['snd'].append(['RREQ', 90,50,50,13,13,0])
     def timer(self):
         pass
                     
                     
 
     def send(self):
-        try:
-            packet  =  self.packetQueue['snd'].pop(0)
-            self.staticsQueue['sndd'][packet[0]].append(packet[1:0])
-            return packet
-        except:
-            return False
+        packet = self.processSendPacket()
+        return packet
+
     def receive(self, packet):
         if  packet != False and packet[1] != self.addr:
             self.packetQueue['rcv'].append(packet)
-        self.processPacket()
-
-    def HelloPkt(self, packet):
-        self.neighbours.append(packet[1:])
-        
-    def RreqPkt(self, packet):
+        self.processReceivedPacket()
+    
+    #['HELLO', source_addr, source_sequence#]
+    def helloPktSend(self, packet):
         pass
-    def RrepPkt(self, packet):
+    #['RREQ', source_addr, source_sequence#, broadcast_id,
+    #dest_addr, dest_sequence#, hop_cnt]
+    def rreqPktSend(self, packet):
+        if packet[1] == self.addr:
+            packet[2:4] = self.sequenceNo, self.broadcast_id
+            try:
+                dest_sequence = routeTable[packet[1]]['seqNo']
+            except:
+                dest_sequence = 0
+            packet[5:7] = dest_sequence,0
+            #[time,[ source_ip, dest_ip, source_seq#, broadcast_id ]]
+            self.rreqQueue.append([0,packet[1:5]])
+            
+            self.broadcast_id = self.broadcast_id + 1
+        else:
+            pass
+            
+    def rrepPktSend(self, packet):
         pass
-    def RerrPtk(self, packet):
+    def rerrPktSend(self, packet):
         pass
-    def DataPtk(self, packet):
+    def dataPtkSend(self, packet):
+        pass 
+    def processSendPacket(self):
+        sendPacketDispatcher = {'HELLO':self.helloPktSend, 'RREQ':self.rreqPktSend, 'RREP':self.rrepPktSend,
+                                'RERR':self.rerrPktSend, 'DATA':self.dataPtkSend}
+        try:
+            packet = self.packetQueue['snd'].pop(0)
+            sendPacketDispatcher[packet[0]](packet)
+            self.staticsQueue['sndd'][packet[0]].append(packet[1:])
+            return packet
+        except:
+            return False
+
+    def helloPktReceived(self, packet):
+        try:
+            self.routeTable[packet[1]]
+            #todo: update routeTable
+        except:
+            self.routeTable[packet[1]]= dict(zip( ('ntHop', 'numOfHops', 'seqNo', 'actvNgbrs', 'expirTime'),
+                                              (packet[1], 0, packet[2], [packet[1]], 3)))
+    def rreqPktReceived(self, packet):
+        if packet[4] == self.addr:
+            pass
+        else:
+            pack = packet[:]
+            pack[6] = pack[6] + 1
+            self.packetQueue['snd'].append(pack)
+    def rrepPktReceived(self, packet):
         pass
-
-
-
-
-    def processPacket(self):
-        dispatch = {'HELLO':self.HelloPkt, 'RREQ':self.RreqPkt, 'RREP':self.RrepPkt,
-                    'RERR':self.RerrPtk, 'DATA':self.DataPtk}
+    def rerrPtkReceived(self, packet):
+        pass
+    def dataPtkReceived(self, packet):
+        pass
+    def processReceivedPacket(self):
+        recivedPacketDispatcher = {'HELLO':self.helloPktReceived, 'RREQ':self.rreqPktReceived, 'RREP':self.rrepPktReceived,
+                    'RERR':self.rerrPtkReceived, 'DATA':self.dataPtkReceived }
         try:
             packet  = self.packetQueue['rcv'].pop(0)
-            
+            recivedPacketDispatcher[packet[0]](packet)
+            self.staticsQueue['rcvd'][packet[0]].append(packet[1:])
         except:
             return
 
-        dispatch[packet[0]](packet)
-        self.staticsQueue['rcvd'][packet[0]].append(packet[1:])
+
 
 
 class Node:
@@ -224,7 +272,7 @@ class Node:
 
 
 nodes = [ Node(AODV,RandomWayPoint,[1,2],[4,5],1,1000,1000,10,0,20, 1 ), 
-          Node(AODV,RandomWayPoint,[20,20], [23,24],1, 1000,1000,10,0,10, 1) ]
+          Node(AODV,RandomWayPoint,[20,20], [23,24],1, 1000,1000,10,0,10, 1)]
 
 arrx = [[],[]]
 arry = [[],[]]
@@ -239,12 +287,15 @@ for i in range(2000):
 #pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
 #pylab.figtext(0.35,0.05,'node mobile modle')
 #pylab.show()
-
-for netnode in nodes:
-    packet = netnode.send()
-    for node in nodes:
-        node.recive(packet)
+for n in range(3):
+    for netnode in nodes:
+        i = netnode.rPro.addr
+        packet = netnode.send()
+        for node in nodes:
+            if i != node.rPro.addr:
+                node.recive(packet)
 
 for netnode in nodes:
     print netnode.rPro.addr, netnode.rPro.staticsQueue
-    print netnode.rPro.neighbours
+    print 'routeTB',netnode.rPro.routeTable
+    print 'packet', netnode.rPro.packetQueue

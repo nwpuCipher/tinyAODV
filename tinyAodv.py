@@ -345,8 +345,8 @@ class Node:
 
 
 
-nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],1,1000,1000,10,0,20, 1 ), 
-          Node(AODV,1,RandomWayPoint,[30,40], [23,24],1, 1000,1000,10,0,10, 1)]
+nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],10,1000,1000,10,5,20, 1 ), 
+          Node(AODV,1,RandomWayPoint,[30,40], [25,24],10, 1000,1000,10,5,20, 1)]
 
 arrx = [[],[]]
 arry = [[],[]]
@@ -391,11 +391,12 @@ for n in range(30):
                     print 'link broken'
 
     for index, node in zip( xrange(sys.maxint),nodes):
-        netnode.rPro.timer()
-        node.move()
         pos = node.mMod.curPos
         arrx[index].append(pos[0])
         arry[index].append(pos[1])
+
+        netnode.rPro.timer()
+        node.move()
 
 
 for netnode in nodes:
@@ -409,5 +410,5 @@ for netnode in nodes:
     print '+'*20
 pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
 pylab.plot( arrx[0], arry[0],'o', arrx[1], arry[1],'x' )
-pylab.figtext(0.35,0.05,'node mobile modle')
+pylab.figtext(0.35,0.05,'node mobile model')
 pylab.show()

@@ -375,6 +375,9 @@ nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],1,1000,1000,5,5,20, 1 ),
           Node(AODV,5,RandomWayPoint,[120,110], [105,224],1, 1000,1000,5,5,20, 1),
           Node(AODV,6,RandomWayPoint,[90,100], [105,224],1, 1000,1000,5,5,20, 1)]
 
+nodes = [Node(AODV,i,RandomWayPoint, [random.randint(0,1000),random.randint(0,1000)],
+               [random.randint(0,1000),random.randint(0,1000)], 5, 1000,1000,5,5,20,1) for i in range(32)]
+
 #arrx = [[],[], [], []]
 #arry = [[],[], [], []]
 
@@ -394,7 +397,7 @@ nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],1,1000,1000,5,5,20, 1 ),
 # RREQ  packet:< my_ip, 'broadcast', ['RREQ', source_addr, source_sequence#, broadcast_id, dest_addr, dest_sequence#, hop_cnt] >
 # RREP  packet:< my_ip, nxt_ip, ['RREP', s_addr, d_addr, d_seq#, hop_cnt, lifetime]>
 #nodes[0].rPro.generatePacket([0, 'broadcast',['HELLO',0,99 ]])
-nodes[0].rPro.generateDataPacket(5,1000)
+nodes[0].rPro.generateDataPacket(31,1000)
 #nodes[1].rPro.generateDataPacket(0,20)
 #nodes[0].rPro.generatePacket([0,'broadcast',
 #                         ['RREQ',0,99,0,1,88,1 ]])
@@ -406,7 +409,7 @@ nodes[0].rPro.generateDataPacket(5,1000)
 #nodes[0].rPro.dataToPakcet()
 dropPkt = [0]
 
-for t in range(10000):
+for t in range(500):
     for index, node in zip( xrange(sys.maxint),nodes):
         pos = node.mMod.curPos
         #arrx[index].append(pos[0])
@@ -417,19 +420,19 @@ for t in range(10000):
         
     if t > 0 and t % 10 == 0:
         try:
-            dropPkt.append( 1 - len(nodes[5].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA'])))
+            dropPkt.append( 1 - len(nodes[31].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA'])))
         except:
             dropPkt.append(0)
 
     print 'cicle', t
-    for n in range(5):
+    for n in range(15):
 
         for netnode in nodes:
             i = netnode.rPro.addr
             packet = netnode.send()
             for node in nodes:
                 if i != node.rPro.addr:
-                    if distance(node.mMod.curPos, netnode.mMod.curPos) <60:
+                    if distance(node.mMod.curPos, netnode.mMod.curPos) <200:
                         node.recive(packet)
                     else:
                         #print 'link broken', packet, 'lost'
@@ -450,5 +453,7 @@ for t in range(10000):
 #pylab.plot( arrx[0], arry[0], arrx[1], arry[1], arrx[2],arry[2], arrx[3], arry[3] )
 pylab.plot([i for i in range(len(dropPkt))], dropPkt)
 pylab.figtext(0.35,0.05,'node mobile model')
-print 1 - len(nodes[5].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA']))
+print len(nodes[0].rPro.staticsQueue['sndd']['DATA'])
+print len(nodes[31].rPro.staticsQueue['rcvd']['DATA'])
+print 1 - len(nodes[31].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA']))
 pylab.show()

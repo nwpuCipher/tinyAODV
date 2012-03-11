@@ -141,14 +141,20 @@ class AODV(RouteProtocl):
         #self.packetQueue['snd'].append([self.addr, 'broadcast', ['HELLO', self.addr,100] ])
         #self.packetQueue['snd'].append([self.addr, 'broadcast', ['RREQ', 11, 99, 11, 20, 99, 5] ] )
     def timer(self):
+        rec = []
         for index, entry in zip(xrange(sys.maxint), self.rreqQueue):
             entry[0] -= 1
             if entry[0] == 0:
-                self.rreqQueue.pop(index)
+                print 'RREQ TIME out!'
+                rec.append(index)
+        rec.reverse()
+        for index in rec:
+            self.rreqQueue.pop(index)
         rec = []
         for key in self.routeTable:
             self.routeTable[key]['expirTime'] -= 1
             if self.routeTable[key]['expirTime'] == 0:
+                print 'RouteTable timeout!'
                 rec.append(key)
         for key in rec:
             self.routeTable.pop(key)
@@ -204,7 +210,7 @@ class AODV(RouteProtocl):
     def helloPktSend(self, packet):
         pass
     def rreqPktSend(self, packet):
-        self.rreqQueue.append( [3, packet[2]] )   
+        self.rreqQueue.append( [4, packet[2]] )   
     def rrepPktSend(self, packet):
         pass
     def rerrPktSend(self, packet):
@@ -237,16 +243,21 @@ class AODV(RouteProtocl):
                 return False
 
         print 'node',self.addr,'received a RREQ from',packet[0], 'which is', packet[2][1], '->',packet[2][4]
-
-        # updata the routeTable
-        self.routeTable[packet[2][1]] = dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
-                                                  (packet[0], packet[2][6], packet[2][2], [], 3 )))
         
         # if the packet is for me
         if packet[2][4] == self.addr:
-            self.packetQueue['snd'].append( [self.addr, packet[0],
-                                             ['RREP', packet[2][1], packet[2][4], self.sequenceNo, 1, 'lifeTime']] )
+            if self.routeTable.has_key(packet[2][1]):
+                return True
+            else:
+                self.routeTable[packet[2][1]] = dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
+                                                          (packet[0], packet[2][6], packet[2][2], [], 3 )))
+                self.packetQueue['snd'].append( [self.addr, packet[0],
+                                                 ['RREP', packet[2][1], packet[2][4], self.sequenceNo, 1, 'lifeTime']] )
             return True
+
+        self.routeTable[packet[2][1]] = dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
+                                                  (packet[0], packet[2][6], packet[2][2], [], 3 )))
+
 
         
 
@@ -279,16 +290,17 @@ class AODV(RouteProtocl):
     def rrepPktReceived(self, packet):
         print 'node',self.addr,'received a RREP from',packet[0], 'which is', packet[2][1], '->',packet[2][2]
 
-        # record the route entry from dst to me
-        self.routeTable[packet[2][2]] =  dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
-                                                  (packet[0], packet[2][4], packet[2][3], [], 3 )))
+        # record the route entry from me to dst
+        if self.routeTable.has_key(packet[2][2]) == False:
+            self.routeTable[packet[2][2]] =  dict(zip( ('ntHop', 'numOfHops', 'dstSeqNo', 'actvNgbrs', 'expirTime'),
+                                                       (packet[0], packet[2][4], packet[2][3], [], 3 )))
 
         # TODO: delete the entry in the rreqQueue
         for index, entry in zip(xrange(sys.maxint), self.rreqQueue):
             if packet[2][1] == entry[1][1] and packet[2][2] == entry[1][4]:
                 print '+--A successful Route Discorvery from', packet[2][1], 'to', packet[2][2]
                 self.rreqQueue.pop(index)
-                return True
+        
         
         try:
             # if there is a route entry for the source
@@ -301,12 +313,22 @@ class AODV(RouteProtocl):
             return True
         except:
             # else, just drop this RREP packet
-            print '+--No route to', packet[2][1], 'RREP from', packet[2][1], 'to', packet[2][2], 'dropped'
+            print '+--No route to', packet[2][2], 'RREP from', packet[2][1], 'to', packet[2][2], 'dropped'
             return False
             
     def rerrPtkReceived(self, packet):
         pass
+
     def dataPtkReceived(self, packet):
+        print self.addr, 'DATA',packet[2][1],'->', packet[2][2], 'num:', packet[2][3]
+        if packet[2][2] == self.addr:
+            return True
+        else:
+            if self.routeTable.has_key(packet[2][2]):
+                packet[1] = self.routeTable[packet[2][2]]['ntHop']
+                self.packetQueue['snd'].append(packet)
+            else:
+                pass
         return True
 
     def processReceivedPacket(self):
@@ -345,11 +367,16 @@ class Node:
 
 
 
-nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],10,1000,1000,10,5,20, 1 ), 
-          Node(AODV,1,RandomWayPoint,[30,40], [25,24],10, 1000,1000,10,5,20, 1)]
+nodes = [ Node(AODV,0,RandomWayPoint,[0,0],[4,5],1,1000,1000,5,5,20, 1 ), 
+          Node(AODV,1,RandomWayPoint,[30,40], [25,24],1, 1000,1000,5,5,20, 1),
+          Node(AODV,2,RandomWayPoint,[50,50], [55,24],1, 1000,1000,5,5,20, 1),
+          Node(AODV,3,RandomWayPoint,[80,70], [75,54],1, 1000,1000,5,5,20, 1),
+          Node(AODV,4,RandomWayPoint,[100,100], [75,64],1, 1000,1000,5,5,20, 1),
+          Node(AODV,5,RandomWayPoint,[120,110], [105,224],1, 1000,1000,5,5,20, 1),
+          Node(AODV,6,RandomWayPoint,[90,100], [105,224],1, 1000,1000,5,5,20, 1)]
 
-arrx = [[],[]]
-arry = [[],[]]
+#arrx = [[],[], [], []]
+#arry = [[],[], [], []]
 
 #for i in range(2000):
 #    for index, node in zip( xrange(sys.maxint),nodes):
@@ -367,8 +394,8 @@ arry = [[],[]]
 # RREQ  packet:< my_ip, 'broadcast', ['RREQ', source_addr, source_sequence#, broadcast_id, dest_addr, dest_sequence#, hop_cnt] >
 # RREP  packet:< my_ip, nxt_ip, ['RREP', s_addr, d_addr, d_seq#, hop_cnt, lifetime]>
 #nodes[0].rPro.generatePacket([0, 'broadcast',['HELLO',0,99 ]])
-nodes[0].rPro.generateDataPacket(1,20)
-nodes[1].rPro.generateDataPacket(0,20)
+nodes[0].rPro.generateDataPacket(5,1000)
+#nodes[1].rPro.generateDataPacket(0,20)
 #nodes[0].rPro.generatePacket([0,'broadcast',
 #                         ['RREQ',0,99,0,1,88,1 ]])
 #nodes[0].rPro.rreqQueue.append([3,['RREQ',0,99,0,1,88,1 ] ])
@@ -377,38 +404,51 @@ nodes[1].rPro.generateDataPacket(0,20)
 #nodes[0].rPro.generatePacket([20,1,
 #                         ['RREP',0,99,77,2,0 ]])
 #nodes[0].rPro.dataToPakcet()
+dropPkt = [0]
 
-for n in range(30):
-    print 'cicle', n
-    for netnode in nodes:
-        i = netnode.rPro.addr
-        packet = netnode.send()
-        for node in nodes:
-            if i != node.rPro.addr:
-                if distance(node.mMod.curPos, netnode.mMod.curPos) <60:
-                    node.recive(packet)
-                else:
-                    print 'link broken'
-
+for t in range(10000):
     for index, node in zip( xrange(sys.maxint),nodes):
         pos = node.mMod.curPos
-        arrx[index].append(pos[0])
-        arry[index].append(pos[1])
+        #arrx[index].append(pos[0])
+       # arry[index].append(pos[1])
 
-        netnode.rPro.timer()
+        node.rPro.timer()
         node.move()
+        
+    if t > 0 and t % 10 == 0:
+        try:
+            dropPkt.append( 1 - len(nodes[5].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA'])))
+        except:
+            dropPkt.append(0)
+
+    print 'cicle', t
+    for n in range(5):
+
+        for netnode in nodes:
+            i = netnode.rPro.addr
+            packet = netnode.send()
+            for node in nodes:
+                if i != node.rPro.addr:
+                    if distance(node.mMod.curPos, netnode.mMod.curPos) <60:
+                        node.recive(packet)
+                    else:
+                        #print 'link broken', packet, 'lost'
+                        pass
 
 
-for netnode in nodes:
-    print '+'*20
-    print netnode.rPro.addr 
-    print netnode.rPro.staticsQueue
-    print 'routeTB',netnode.rPro.routeTable
-    print 'packet', netnode.rPro.packetQueue
-    print 'rreqQ', netnode.rPro.rreqQueue
-    print 'data', netnode.rPro.dataQueue
-    print '+'*20
-pylab.plot( arrx[0], arry[0], arrx[1], arry[1] )
-pylab.plot( arrx[0], arry[0],'o', arrx[1], arry[1],'x' )
+
+
+#for netnode in nodes:
+ #   print '+'*20
+  #  print netnode.rPro.addr 
+  #  print netnode.rPro.staticsQueue
+   # print 'routeTB',netnode.rPro.routeTable
+   # print 'packet', netnode.rPro.packetQueue
+   # print 'rreqQ', netnode.rPro.rreqQueue
+   # print 'data', netnode.rPro.dataQueue
+   # print '+'*20
+#pylab.plot( arrx[0], arry[0], arrx[1], arry[1], arrx[2],arry[2], arrx[3], arry[3] )
+pylab.plot([i for i in range(len(dropPkt))], dropPkt)
 pylab.figtext(0.35,0.05,'node mobile model')
+print 1 - len(nodes[5].rPro.staticsQueue['rcvd']['DATA']) / float(len(nodes[0].rPro.staticsQueue['sndd']['DATA']))
 pylab.show()
